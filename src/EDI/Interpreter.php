@@ -4,31 +4,49 @@ namespace PHPProceda\EDI;
 
 class Interpreter
 {
-    private $file;
     private $config;
+    private $file;
+    private $version;
+    private $skeleton;
 
     /**
-     * EDI constructor.
+     * @param $version
+     */
+    public function setLayout ($version) {
+        $this->version = $version;
+        if ($version = 3) {
+            $this->skeleton = $this->__skeleton_v3;
+            $this->config   = ['000', '340', '341', '342'];
+        } else {
+            $this->config   = ['000', '540', '541', '542'];
+        }
+    }
+
+    /**
      * @param $file
      */
-    public function __construct($file)
-    {
+    public function setFile ( $file) {
         $this->file = $file;
     }
 
-    private function setv3Version () {
-        $this->config = ['000', '340', '341', '342'];
-    }
-
-    public function convertV3ToJSON () {
-        $transformer = [];
-        $this->setv3Version();
+    /**
+     * @param array $transformer
+     * @return array
+     */
+    public function convertOCORENToJSON ($transformer = []) {
         foreach(file($this->file) as $line) {
-
             $code = substr($line, 0, 3);
             if (in_array($code, $this->config)) {
-                $l = $this->processLineV3($line);
-                $transformer[$code] = $l;
+                $l = $this->processLine($line);
+
+                if ($this->version = 3) {
+                    if ($code == '342') {
+                        $transformer[$code][] = $l;
+                    } else {
+                        $transformer[$code] = $l;
+                    }
+
+                }
             }
         }
         return $transformer;
@@ -36,19 +54,20 @@ class Interpreter
 
     /**
      * @param $line
+     * @param $version
      * @return array
      */
-    public function processLineV3( $line )
+    public function processLine ($line)
     {
-        $code = substr($line, 0, 3);
+        $code           = substr($line, 0, 3);
 
-        if (isset($this->__editConfig_v3[$code])) {
-            $notfisArgs = $this->__editConfig_v3[$code];
+        if (isset($this->skeleton[$code])) {
+            $notfisArgs = $this->skeleton[$code];
             return $this->extract($line, $notfisArgs);
         }
     }
 
-    private $__editConfig_v3 = array(
+    private $__skeleton_v3 = array(
         '000' => array(
             // Registro para a identificação do arquivo de OCOREN gerado pela transportadora OCORRE = 1 POR ARQUIVO GERADO
             'cabInter' => array(
@@ -56,11 +75,11 @@ class Interpreter
                 'identDest' => [38, 35], // IDENTIFICAÇÃO DO DESTINATÁRIO
                 'data' => [73, 6], // Data
                 'hora' => [79, 4], // Hora
-                'identInter' => [83, 12], // Identificação do Intercâmbio -
-                // SUGESTÃO: "OCO50DDMM999"
-                // "OCO50" = CONSTANTE OCOrrência+Versão 50
-                // "DDMM"= DIA/MÊS
-                // "SSS" = SEQUÊNCIA DE 0000 A 999
+                'identInter' => [83, 12],   // Identificação do Intercâmbio -
+                                            // SUGESTÃO: "OCO50DDMM999"
+                                            // "OCO50" = CONSTANTE OCOrrência+Versão 50
+                                            // "DDMM"= DIA/MÊS
+                                            // "SSS" = SEQUÊNCIA DE 0000 A 999
             ),
         ),
         // Registro para a especificação dos dados de identificação do documento OCOREN.
