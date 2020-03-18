@@ -4,6 +4,49 @@ namespace PHPProceda\EDI;
 
 class Interpreter
 {
+    private $file;
+    private $config;
+
+    /**
+     * EDI constructor.
+     * @param $file
+     */
+    public function __construct($file)
+    {
+        $this->file = $file;
+    }
+
+    private function setv3Version () {
+        $this->config = ['000', '340', '341', '342'];
+    }
+
+    public function convertV3ToJSON () {
+        $transformer = [];
+        $this->setv3Version();
+        foreach(file($this->file) as $line) {
+
+            $code = substr($line, 0, 3);
+            if (in_array($code, $this->config)) {
+                $l = $this->processLineV3($line);
+                $transformer[$code] = $l;
+            }
+        }
+        return $transformer;
+    }
+
+    /**
+     * @param $line
+     * @return array
+     */
+    public function processLineV3( $line )
+    {
+        $code = substr($line, 0, 3);
+
+        if (isset($this->__editConfig_v3[$code])) {
+            $notfisArgs = $this->__editConfig_v3[$code];
+            return $this->extract($line, $notfisArgs);
+        }
+    }
 
     private $__editConfig_v3 = array(
         '000' => array(
@@ -48,19 +91,6 @@ class Interpreter
         ),
     );
 
-    /**
-     * @param $line
-     * @return array
-     */
-    public function processLineV3( $line )
-    {
-        $code = substr($line, 0, 3);
-
-        if (isset($this->__editConfig_v3[$code])) {
-            $notfisArgs = $this->__editConfig_v3[$code];
-            return $this->extract($line, $notfisArgs);
-        }
-    }
 
     /**
      * Extrai em um array as diversas posições de uma linha
