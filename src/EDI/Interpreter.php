@@ -2,12 +2,27 @@
 
 namespace PHPProceda\EDI;
 
+use DateTime;
+use PHPProceda\EDI\Versions\LayoutV3;
+
 class Interpreter
 {
+    /**
+     * @var array
+     */
     private $config;
+    /**
+     * @var string
+     */
     private $file;
-    private $version;
-    private $skeleton;
+    /**
+     * @var integer
+     */
+    protected $version;
+    /**
+     * @var array
+     */
+    private $skeleton = [];
 
     /**
      * @param $version
@@ -15,7 +30,7 @@ class Interpreter
     public function setLayout ($version) {
         $this->version = $version;
         if ($version = 3) {
-            $this->skeleton = $this->__skeleton_v3;
+            $this->skeleton = LayoutV3::getSkeleton();
             $this->config   = ['000', '340', '341', '342'];
         } else {
             $this->config   = ['000', '540', '541', '542'];
@@ -40,21 +55,42 @@ class Interpreter
                 $l = $this->processLine($line);
 
                 if ($this->version = 3) {
+                    if (isset($l['cabInter']['identData'])) {
+                        $l['cabInter']['identData']       = DateTime::createFromFormat('dmy', $l['cabInter']['identData'])->format('Y-m-d');
+                    }
+                    if (isset($l['cabInter']['identHora'])) {
+                        $l['cabInter']['identHora']       = DateTime::createFromFormat('Hm', $l['cabInter']['identHora'])->format('H:i');
+                    }
+                    if (isset($l['ocoEntrega']['codObs'])) {
+                        $l['ocoEntrega']['descObs'] = LayoutV3::makeDescObservacoes($l['ocoEntrega']['codObs']);
+                    }
+                    if (isset($l['ocoEntrega']['codOcor'])) {
+                        $l['ocoEntrega']['descOcor'] = LayoutV3::makeDescOcorrencia($l['ocoEntrega']['codOcor']);
+                    }
+                    if (isset($l['ocoEntrega']['OcoData'])) {
+                        $l['ocoEntrega']['OcoData']    = DateTime::createFromFormat('dmY', $l['ocoEntrega']['OcoData'])->format('Y-m-d');
+                    }
+                    if (isset($l['ocoEntrega']['OcoHora'])) {
+                        $l['ocoEntrega']['OcoHora']    = DateTime::createFromFormat('Hm', $l['ocoEntrega']['OcoHora'])->format('H:i');
+                    }
                     if ($code == '342') {
-                        $transformer[$code][] = $l;
+                        $transformer[$code][] = $l['ocoEntrega'];
                     } else {
                         $transformer[$code] = $l;
                     }
-
                 }
             }
         }
-        return $transformer;
+        $new['cabInter']    = $transformer['000']['cabInter'];
+        $new['cabDoc']      = $transformer['340']['cabDoc'];
+        $new['identTransp'] = $transformer['341']['identTransp'];
+        $new['ocoEntrega']  = $transformer['342'];
+
+        return $new;
     }
 
     /**
      * @param $line
-     * @param $version
      * @return array
      */
     public function processLine ($line)
@@ -62,54 +98,11 @@ class Interpreter
         $code           = substr($line, 0, 3);
 
         if (isset($this->skeleton[$code])) {
-            $notfisArgs = $this->skeleton[$code];
-            return $this->extract($line, $notfisArgs);
+            $notFisArgs = $this->skeleton[$code];
+            return $this->extract($line, $notFisArgs);
         }
+        return [];
     }
-
-    private $__skeleton_v3 = array(
-        '000' => array(
-            // Registro para a identificação do arquivo de OCOREN gerado pela transportadora OCORRE = 1 POR ARQUIVO GERADO
-            'cabInter' => array(
-                'identRem' => [3, 35], // IDENTIFICADOR DE REMETENTE
-                'identDest' => [38, 35], // IDENTIFICAÇÃO DO DESTINATÁRIO
-                'data' => [73, 6], // Data
-                'hora' => [79, 4], // Hora
-                'identInter' => [83, 12],   // Identificação do Intercâmbio -
-                                            // SUGESTÃO: "OCO50DDMM999"
-                                            // "OCO50" = CONSTANTE OCOrrência+Versão 50
-                                            // "DDMM"= DIA/MÊS
-                                            // "SSS" = SEQUÊNCIA DE 0000 A 999
-            ),
-        ),
-        // Registro para a especificação dos dados de identificação do documento OCOREN.
-        '340' => array(
-            'cabDoc' => array(
-                'identDoc' => [3, 14] // identificação do documento
-            ),
-        ),
-        // Registro para a especificação da identificação da empresa transportadora.
-        '341' => array(
-            'identTransp' => array(
-                'CNPJ' => [3, 14], // CNPJ DA TRANSPORTADORA
-                'rSocial' => [17, 40] // RAZÃO SOCIAL DA TRANSPORTADORA
-            ),
-        ),
-        // Ocorrência na Entrega
-        '342' => array(
-            'ocoEntrega' => array(
-                'nfeCnpjEm' => [3, 14], //CNPJ DA EMBARCADORA
-                'nfeSerie' => [17, 3], //SÉRIE DA NOTA FISCAL
-                'nfeNum' => [20, 8], //NÚMERO DA NOTA FISCAL
-                'cOcor' => [28, 2], //CÓDIGO DE OCORRÊNCIA NA ENTREGA
-                'dOcor' => [30, 8], //DATA DA OCORRÊNCIA
-                'hOcor' => [40, 4], //HORA DA OCORRÊNCIA
-                'cObsOco' => [42, 2], //CÓDIGO DE OBSERVAÇÃO DE OCORRÊNCIA NA ENTRADA
-                'txtLivre' => [44, 70]
-            ),
-        ),
-    );
-
 
     /**
      * Extrai em um array as diversas posições de uma linha
