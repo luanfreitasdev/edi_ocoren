@@ -40,7 +40,7 @@ class Interpreter
     /**
      * @param $file
      */
-    public function setFile ( $file) {
+    public function setFile($file) {
         $this->file = $file;
     }
 
@@ -48,7 +48,7 @@ class Interpreter
      * @param array $transformer
      * @return array
      */
-    public function convertOCORENToJSON ($transformer = []) {
+    public function json($transformer = []) {
         foreach(file($this->file) as $line) {
             $code = substr($line, 0, 3);
             if (in_array($code, $this->config)) {
