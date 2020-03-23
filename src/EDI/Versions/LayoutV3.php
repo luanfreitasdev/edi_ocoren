@@ -14,7 +14,11 @@ class LayoutV3
             '02'=>'Devolução/Recusa Parcial',
             '03'=>'Aceite/entrega de acordo'
         );
-        return $array[$cod];
+        if (in_array($cod, $array)) {
+            return $array[$cod];
+        } else {
+            return $cod;
+        }
     }
 
     /**
