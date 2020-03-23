@@ -44,43 +44,60 @@ class Interpreter
         $this->file = $file;
     }
 
+    function validateDate($date, $format = 'Y-m-d')
+    {
+        $d = DateTime::createFromFormat($format, $date);
+        // The Y ( 4 digits year ) returns TRUE for any integer with any number of digits so changing the comparison from == to === fixes the issue.
+        return $d && $d->format($format) === $date;
+    }
     /**
      * @param array $transformer
      * @return array
      */
     public function json($transformer = []) {
-        foreach(file($this->file) as $line) {
-            $code = substr($line, 0, 3);
-            if (in_array($code, $this->config)) {
-                $l = $this->processLine($line);
 
-                if ($this->version = 3) {
-                    if (isset($l['cabInter']['identData'])) {
-                        $l['cabInter']['identData']       = DateTime::createFromFormat('dmy', $l['cabInter']['identData'])->format('Y-m-d');
+            foreach(file($this->file) as $line) {
+                $code = substr($line, 0, 3);
+                if (in_array($code, $this->config)) {
+                    $l = $this->processLine($line);
+
+                    try {
+                        if ($this->version = 3) {
+                            if (isset($l['cabInter']['identData'])) {
+                                if ($this->validateDate($l['cabInter']['identData']) == true) {
+                                    $l['cabInter']['identData']       = DateTime::createFromFormat('dmy', $l['cabInter']['identData'])->format('Y-m-d');
+                                } else {
+                                    $l['cabInter']['identData']       = '';
+                                }
+                            }
+                            if (isset($l['cabInter']['identHora'])) {
+                                $l['cabInter']['identHora']       = DateTime::createFromFormat('Hm', $l['cabInter']['identHora'])->format('H:i');
+                            }
+                            if (isset($l['ocoEntrega']['codObs'])) {
+                                $l['ocoEntrega']['descObs'] = LayoutV3::makeDescObservacoes($l['ocoEntrega']['codObs']);
+                            }
+                            if (isset($l['ocoEntrega']['codOcor'])) {
+                                $l['ocoEntrega']['descOcor'] = LayoutV3::makeDescOcorrencia($l['ocoEntrega']['codOcor']);
+                            }
+                            if (isset($l['ocoEntrega']['OcoData'])) {
+                                $l['ocoEntrega']['OcoData']    = DateTime::createFromFormat('dmY', $l['ocoEntrega']['OcoData'])->format('Y-m-d');
+                            }
+                            if (isset($l['ocoEntrega']['OcoHora'])) {
+                                $l['ocoEntrega']['OcoHora']    = DateTime::createFromFormat('Hm', $l['ocoEntrega']['OcoHora'])->format('H:i');
+                            }
+                            if ($code == '342') {
+                                $transformer[$code][] = $l['ocoEntrega'];
+                            } else {
+                                $transformer[$code] = $l;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $transformer = [];
                     }
-                    if (isset($l['cabInter']['identHora'])) {
-                        $l['cabInter']['identHora']       = DateTime::createFromFormat('Hm', $l['cabInter']['identHora'])->format('H:i');
-                    }
-                    if (isset($l['ocoEntrega']['codObs'])) {
-                        $l['ocoEntrega']['descObs'] = LayoutV3::makeDescObservacoes($l['ocoEntrega']['codObs']);
-                    }
-                    if (isset($l['ocoEntrega']['codOcor'])) {
-                        $l['ocoEntrega']['descOcor'] = LayoutV3::makeDescOcorrencia($l['ocoEntrega']['codOcor']);
-                    }
-                    if (isset($l['ocoEntrega']['OcoData'])) {
-                        $l['ocoEntrega']['OcoData']    = DateTime::createFromFormat('dmY', $l['ocoEntrega']['OcoData'])->format('Y-m-d');
-                    }
-                    if (isset($l['ocoEntrega']['OcoHora'])) {
-                        $l['ocoEntrega']['OcoHora']    = DateTime::createFromFormat('Hm', $l['ocoEntrega']['OcoHora'])->format('H:i');
-                    }
-                    if ($code == '342') {
-                        $transformer[$code][] = $l['ocoEntrega'];
-                    } else {
-                        $transformer[$code] = $l;
-                    }
+
                 }
             }
-        }
+
         $new['cabInter']    = $transformer['000']['cabInter'];
         $new['cabDoc']      = $transformer['340']['cabDoc'];
         $new['identTransp'] = $transformer['341']['identTransp'];
